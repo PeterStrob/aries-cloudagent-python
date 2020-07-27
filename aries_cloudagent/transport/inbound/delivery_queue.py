@@ -132,6 +132,8 @@ class DeliveryQueue:
         """
         if key in self.queue_by_key:
             return [w_msg.msg for w_msg in self.queue_by_key[key]]
+        else:
+            return []
 
     def remove_message_for_key(self, key: str, msg: OutboundMessage):
         """
