@@ -131,8 +131,7 @@ class DeliveryQueue:
             key: The key to use for lookup
         """
         if key in self.queue_by_key:
-            for wrapped_msg in self.queue_by_key[key]:
-                yield wrapped_msg.msg
+            return [w_msg.msg for w_msg in self.queue_by_key[key]]
 
     def remove_message_for_key(self, key: str, msg: OutboundMessage):
         """

@@ -1,6 +1,6 @@
 import asyncio
 
-from asynctest import TestCase as AsyncTestCase, mock as async_mock
+from asynctest import TestCase as AsyncTestCase, mock as async_mock, call
 
 from ....config.injection_context import InjectionContext
 
@@ -191,6 +191,34 @@ class TestInboundTransportManager(AsyncTestCase):
         ) as mock_accept:
             mgr.process_undelivered(session)
             mock_accept.assert_called_once_with(test_outbound)
+        assert not mgr.undelivered_queue.has_message_for_key(test_verkey)
+
+    async def test_process_undelivered_multiple(self):
+        context = InjectionContext()
+        context.update_settings({"transport.enable_undelivered_queue": True})
+        test_verkey = "test-verkey"
+        test_wire_format = async_mock.MagicMock()
+        mgr = InboundTransportManager(context, None)
+        await mgr.setup()
+
+        test_outbound_1 = OutboundMessage(payload=None)
+        test_outbound_1.reply_to_verkey = test_verkey
+        assert mgr.return_undelivered(test_outbound_1)
+        test_outbound_2 = OutboundMessage(payload=None)
+        test_outbound_2.reply_to_verkey = test_verkey
+        assert mgr.return_undelivered(test_outbound_2)
+        assert mgr.undelivered_queue.message_count_for_key(test_verkey) == 2
+
+        session = await mgr.create_session(
+            "http", can_respond=True, wire_format=test_wire_format
+        )
+        session.add_reply_verkeys(test_verkey)
+
+        with async_mock.patch.object(
+            session, "accept_response", return_value=True
+        ) as mock_accept:
+            mgr.process_undelivered(session)
+            mock_accept.assert_has_calls([call(test_outbound_1), call(test_outbound_2)], any_order=True)
         assert not mgr.undelivered_queue.has_message_for_key(test_verkey)
 
     async def test_return_undelivered_false(self):
